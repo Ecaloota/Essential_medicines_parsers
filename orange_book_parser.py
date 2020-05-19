@@ -52,7 +52,7 @@ class Drug(object):
             "DF_Route":self.df_route, ## split into df and route easily
             "Trade_Name":self.trade_name,
             "Applicant":self.applicant,
-            "Strength":self.parse_strength(),
+            "Strength":self.parse_strength(self.strength),
             "Appl_Type":self.application_type, ##(N) or (A)
             "Appl_No":self.application_number, ## unique identifier #1
             "Product_No":self.product_number, ## unique identifier #2
@@ -88,9 +88,24 @@ class Drug(object):
                 date = dt.date(dt.strptime("Jan 1, 1982", "%b %d, %Y"))
         return date
 
-    def parse_strength(self):
+    def parse_strength(self,strength):
         replace_string = "**Federal Register determination that product was not discontinued or withdrawn for safety or efficacy reasons**"
-        return self.strength.replace(replace_string,'')
+        return strength.replace(replace_string,'')
+
+    @staticmethod
+    def get_drugs_from_products_file(filename="products.txt"):
+        '''reads the filename into a list of dictionaries. Doesn't do error checking'''
+        drug_list = []
+        with open(filename,'r') as fh:
+            header = fh.readline().strip().split('~') ## dictionary keys
+            for line in fh:
+                l = line.split('~')
+                drug_list.append(Drug(l[0],l[1],l[2],l[3],l[4],l[5],l[6],l[7],l[9],l[12],l[13]))
+        return drug_list
+
+    @staticmethod
+    def clean_user_provided_drug_list(essential_drugs_list):
+        return [drug.split('+') for drug in essential_drugs_list]
 
     @staticmethod
     def condense_generics(essential_drugs):
@@ -109,17 +124,6 @@ class Drug(object):
         return essential_drugs
 
     @staticmethod
-    def get_drugs_from_products_file(filename="products.txt"):
-        '''reads the filename into a list of dictionaries. Doesn't do error checking'''
-        drug_list = []
-        with open(filename,'r') as fh:
-            header = fh.readline().strip().split('~') ## dictionary keys
-            for line in fh:
-                l = line.split('~')
-                drug_list.append(Drug(l[0],l[1],l[2],l[3],l[4],l[5],l[6],l[7],l[9],l[12],l[13]))
-        return drug_list
-
-    @staticmethod
     def find_drugs_under_patent(drug_list, filename="patent.txt"):
         '''receives a list of Drug dictionaries, then looks to see if the unique identifier for a particular drug 
         is in the patents file. If so, modifies that Drug's Under_Patent key to True and updates Latest_Expiration_Date, 
@@ -132,9 +136,9 @@ class Drug(object):
                     if drug.properties['Appl_No'] == l[1] and drug.properties['Product_No'] == l[2]:
                         drug.properties['Under_Patent']=True
                         if drug.properties['Latest_Patent_Date'] is None:
-                            drug.properties['Latest_Patent_Date']=dt.date(dt.strptime(l[4], "%b %d, %Y"))
-                        elif dt.date(dt.strptime(l[4], "%b %d, %Y")) > drug.properties['Latest_Patent_Date']:
-                            drug.properties['Latest_Patent_Date'] = dt.date(dt.strptime(l[4], "%b %d, %Y"))
+                            drug.properties['Latest_Patent_Date']=dt.date(dt.strptime(l[4].strip(), "%b %d, %Y"))
+                        elif dt.date(dt.strptime(l[4].strip(), "%b %d, %Y")) > drug.properties['Latest_Patent_Date']:
+                            drug.properties['Latest_Patent_Date'] = dt.date(dt.strptime(l[4].strip(), "%b %d, %Y"))
         
         return drug_list
 
@@ -152,34 +156,38 @@ class Drug(object):
                         drug.properties['Exclusivity_Agreement']=True
                         if drug.properties['Latest_Exclusivity_Date'] is None:
                             drug.properties['Latest_Exclusivity_Date']=dt.date(dt.strptime(l[4].strip(), "%b %d, %Y"))
-                        elif dt.date(dt.strptime(l[4], "%b %d, %Y")) > drug.properties['Latest_Patent_Date']:
-                            drug.properties['Latest_Exclusivity_Date'] = dt.date(dt.strptime(l[4], "%b %d, %Y"))
+                        elif dt.date(dt.strptime(l[4].strip(), "%b %d, %Y")) > drug.properties['Latest_Exclusivity_Date']:
+                            drug.properties['Latest_Exclusivity_Date'] = dt.date(dt.strptime(l[4].strip(), "%b %d, %Y"))
 
         return drug_list
 
     @staticmethod
-    def clean_user_provided_drug_list(essential_drugs_list):
-        return [drug.split('+') for drug in essential_drugs_list]
-
-    @staticmethod
-    def keep_only_essential_drugs(drug_list,clean_essential_drugs_list):
-        '''receives a list of drug dictionaries and removes those entries that aren't in essential_drugs_list.
-        This would benefit from some serious code-review!'''
-
-        for drug in drug_list: ## These are Drug objects from the products.txt file
+    def keep_only_approved_essential_drugs(drug_list,essential_drugs,bad_words):
+        '''receives a list of drug dictionaries and removes those entries that aren't in essential_drugs_list.'''
+    
+        for drug in drug_list:
+            for essential_drug in essential_drugs:
+                drug_components_copy = sorted(drug.properties['Ingredient'], key=len)
+                essential_components_copy = sorted(essential_drug, key=len)
+                counter=0
+                for word in essential_drug:
+                    is_sub, index = any([word in s for s in drug_components_copy]), -1
+                    if is_sub:
+                        index = [word in s for s in drug_components_copy].index(True)
+                        drug_components_copy.pop(index)
+                        essential_components_copy.remove(word)
+                        counter+=1
+                if counter==len(essential_drug) and counter==len(drug.properties['Ingredient']):
+                    drug.properties['FDA_Approved'] = True
+        
+        approved_drugs = [drug for drug in drug_list if drug.properties['FDA_Approved']]
+        for drug in approved_drugs:
             for component in drug.properties['Ingredient']:
-                for essential_drug in clean_essential_drugs_list:
-                    if len(essential_drug)==len(drug.properties['Ingredient']):
-                        for elem in essential_drug:
-                            if elem not in drug.properties['Ingredient']:
-                                break
-                            else:
-                                drug.properties['FDA_Approved'] = True
+                for bad_drug in bad_words:
+                    if bad_drug in component:
+                        drug.properties['FDA_Approved'] = False
 
-        return [drug for drug in drug_list if drug.properties['FDA_Approved']]
-
-    #@staticmethod
-    #def pretty_print_dates()
+        return [drug for drug in approved_drugs if drug.properties['FDA_Approved']]
 
     @staticmethod
     def write_drugs_to_file(drug_list,filename="output.csv"):
@@ -187,7 +195,8 @@ class Drug(object):
 
         with open(filename,'w') as fh:
             csvwriter = csv.writer(fh)
-            csvwriter.writerow(["Ingredient","DF_Route","Trade_Name","Strength","Approval_Date","Type","Applicant_Full_Name","Under_Patent","Latest_Patent_Date","Exclusivity_Agreement","Latest_Exclusivity_Date","Generic_Forms"])
+            csvwriter.writerow(["Ingredient","DF_Route","Trade_Name","Strength","Approval_Date","Type","Applicant_Full_Name",\
+                "Under_Patent","Latest_Patent_Date","Exclusivity_Agreement","Latest_Exclusivity_Date","Generic_Forms"])
             for drug in drug_list:
                 csvwriter.writerow(\
                     [drug.properties["Ingredient"],\
@@ -204,19 +213,21 @@ class Drug(object):
                     drug.properties["Generic_Forms"]]\
                 )
 
-
 essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazole','amikacin','amodiaquine',\
                         'amodiaquine+sulfadoxine+pyrimethamine','amoxicillin','amoxicillin+clavulanate','amphotericin B',\
                         'ampicillin','artemether','artemether+lumefantrine','artesunate+amodiaquine','artesunate+mefloquine'\
                         'artesunate+pyronaridine tetraphosphate','atazanavir','azithromycin']
 
+## a bad_word is one which contains the name of an essential_drug within it, but is itself
+## not an essential_drug. i.e. valacyclovir contains 'acyclovir' which is an essential_drug,
+## while 'valacyclovir' is not itself an essential_drug.
+bad_words = ['valacyclovir','bacampicillin']
 
 
 if __name__=="__main__":
     drug_list = Drug.get_drugs_from_products_file('products.txt')
-    [print(drug.properties['Generic_Forms']) for drug in drug_list]
     essential_drugs = Drug.clean_user_provided_drug_list(essential_drugs_list)
-    essential_drugs = Drug.keep_only_essential_drugs(drug_list,essential_drugs)
+    essential_drugs = Drug.keep_only_approved_essential_drugs(drug_list,essential_drugs,bad_words)
     essential_drugs = Drug.find_drugs_under_patent(essential_drugs,'patent.txt')
     essential_drugs = Drug.find_exclusive_drugs(essential_drugs,'exclusivity.txt')
     essential_drugs = Drug.condense_generics(essential_drugs)
