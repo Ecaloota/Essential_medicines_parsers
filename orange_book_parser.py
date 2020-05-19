@@ -195,7 +195,7 @@ class Drug(object):
 
         with open(filename,'w') as fh:
             csvwriter = csv.writer(fh)
-            csvwriter.writerow(["Ingredient","DF_Route","Trade_Name","Strength","Approval_Date","Type","Applicant_Full_Name",\
+            csvwriter.writerow(["Ingredient","DF_Route","Trade_Name","Strength","Approval_Date","Type","Application Type","Applicant_Full_Name",\
                 "Under_Patent","Latest_Patent_Date","Exclusivity_Agreement","Latest_Exclusivity_Date","Generic_Forms"])
             for drug in drug_list:
                 csvwriter.writerow(\
@@ -205,6 +205,7 @@ class Drug(object):
                     drug.properties["Strength"],\
                     drug.properties["Approval_Date"],\
                     drug.properties["Type"],\
+                    drug.properties["Appl_Type"],\
                     drug.properties["Applicant_Full_Name"],\
                     drug.properties["Under_Patent"],\
                     drug.properties["Latest_Patent_Date"],\
@@ -213,10 +214,12 @@ class Drug(object):
                     drug.properties["Generic_Forms"]]\
                 )
 
-essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazole','amikacin','amodiaquine',\
-                        'amodiaquine+sulfadoxine+pyrimethamine','amoxicillin','amoxicillin+clavulanate','amphotericin B',\
-                        'ampicillin','artemether','artemether+lumefantrine','artesunate+amodiaquine','artesunate+mefloquine'\
-                        'artesunate+pyronaridine tetraphosphate','atazanavir','azithromycin']
+#essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazole','amikacin','amodiaquine',\
+#                        'amodiaquine+sulfadoxine+pyrimethamine','amoxicillin','amoxicillin+clavulanate','amphotericin B',\
+#                        'ampicillin','artemether','artemether+lumefantrine','artesunate+amodiaquine','artesunate+mefloquine'\
+#                        'artesunate+pyronaridine tetraphosphate','atazanavir','azithromycin']
+
+essential_drugs_list = ['atazanavir'] ## debugging
 
 ## a bad_word is one which contains the name of an essential_drug within it, but is itself
 ## not an essential_drug. i.e. valacyclovir contains 'acyclovir' which is an essential_drug,
@@ -231,4 +234,4 @@ if __name__=="__main__":
     essential_drugs = Drug.find_drugs_under_patent(essential_drugs,'patent.txt')
     essential_drugs = Drug.find_exclusive_drugs(essential_drugs,'exclusivity.txt')
     essential_drugs = Drug.condense_generics(essential_drugs)
-    Drug.write_drugs_to_file(essential_drugs,'output.csv')
+    Drug.write_drugs_to_file(essential_drugs,'output_debug.csv')
