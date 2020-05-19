@@ -214,12 +214,10 @@ class Drug(object):
                     drug.properties["Generic_Forms"]]\
                 )
 
-#essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazole','amikacin','amodiaquine',\
-#                        'amodiaquine+sulfadoxine+pyrimethamine','amoxicillin','amoxicillin+clavulanate','amphotericin B',\
-#                        'ampicillin','artemether','artemether+lumefantrine','artesunate+amodiaquine','artesunate+mefloquine'\
-#                        'artesunate+pyronaridine tetraphosphate','atazanavir','azithromycin']
-
-essential_drugs_list = ['atazanavir'] ## debugging
+essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazole','amikacin','amodiaquine',\
+                        'amodiaquine+sulfadoxine+pyrimethamine','amoxicillin','amoxicillin+clavulanate','amphotericin B',\
+                        'ampicillin','artemether','artemether+lumefantrine','artesunate+amodiaquine','artesunate+mefloquine'\
+                        'artesunate+pyronaridine tetraphosphate','atazanavir','azithromycin']
 
 ## a bad_word is one which contains the name of an essential_drug within it, but is itself
 ## not an essential_drug. i.e. valacyclovir contains 'acyclovir' which is an essential_drug,
@@ -234,4 +232,4 @@ if __name__=="__main__":
     essential_drugs = Drug.find_drugs_under_patent(essential_drugs,'patent.txt')
     essential_drugs = Drug.find_exclusive_drugs(essential_drugs,'exclusivity.txt')
     essential_drugs = Drug.condense_generics(essential_drugs)
-    Drug.write_drugs_to_file(essential_drugs,'output_debug.csv')
+    Drug.write_drugs_to_file(essential_drugs,'output.csv')
