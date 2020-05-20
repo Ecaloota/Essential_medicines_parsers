@@ -44,17 +44,18 @@ class Drug(object):
         self.exclusivity_agreement = None
         self.latest_exclusivity_date = None
         self.latest_expiration_date = None
+        self.is_generic = False
         self.generic_forms = []
         self.fda_approved = False
 
         self.properties = {
             "Ingredient":self.parse_ingredient_name(self.ingredient),
             "DF_Route":self.df_route, ## split into df and route easily
-            "Trade_Name":self.trade_name,
+            "Trade_Name":self.parse_trade_name(self.trade_name),
             "Applicant":self.applicant,
             "Strength":self.parse_strength(self.strength),
             "Appl_Type":self.application_type, ##(N) or (A)
-            "Appl_No":self.application_number, ## unique identifier #1
+            "Appl_No":self.parse_appl_no(self.application_number), ## unique identifier #1
             "Product_No":self.product_number, ## unique identifier #2
             "Approval_Date":self.parse_approval_date(self.approval_date),
             "Type":self.type_val, #DISCN, OTC, RX
@@ -64,6 +65,7 @@ class Drug(object):
             "Exclusivity_Agreement":self.exclusivity_agreement,
             "Latest_Exclusivity_Date":self.latest_exclusivity_date,
             "Latest_Expiration_Date":self.latest_expiration_date,
+            "Is_Generic":self.is_generic,
             "Generic_Forms":self.generic_forms,
             "FDA_Approved":self.fda_approved
         }
@@ -90,7 +92,13 @@ class Drug(object):
 
     def parse_strength(self,strength):
         replace_string = "**Federal Register determination that product was not discontinued or withdrawn for safety or efficacy reasons**"
-        return strength.replace(replace_string,'')
+        return strength.replace(replace_string,'').strip()
+
+    def parse_trade_name(self,trade_name):
+        return trade_name.strip().lower()
+
+    def parse_appl_no(self,appl_no):
+        return appl_no.strip().lower()
 
     @staticmethod
     def get_drugs_from_products_file(filename="products.txt"):
@@ -112,16 +120,18 @@ class Drug(object):
         '''Generics have identical active ingredients, dosage forms, routes of admin., and strength
         We remove generics from the essential_drugs list'''
         for drug in essential_drugs:
-            if drug.properties['Appl_Type']=="N" and drug.properties['Under_Patent'] is None \
-                and drug.properties['Exclusivity_Agreement'] is None:
-                for other in essential_drugs:
-                    if other.properties['Appl_Type']=="A" and drug.properties['Ingredient']==other.properties['Ingredient'] \
-                        and drug.properties['DF_Route']==other.properties['DF_Route'] \
-                            and drug.properties['Strength']==other.properties['Strength']:
+            for other in essential_drugs:
+                if drug.properties["Appl_Type"]=="N" and drug.properties["Under_Patent"] is None \
+                    and drug.properties["Exclusivity_Agreement"] is None:
+                    if other.properties['Appl_Type']=="A" \
+                        and drug.properties["Ingredient"]==other.properties["Ingredient"] \
+                            and drug.properties['DF_Route']==other.properties['DF_Route'] \
+                                and drug.properties['Strength']==other.properties['Strength']:
                         drug.properties['Generic_Forms'].append(list((other.properties['Applicant_Full_Name'],\
                             other.properties['Approval_Date'],other.properties['Type'])))
-                        essential_drugs.remove(other)
-        return essential_drugs
+                        other.properties["Is_Generic"]=True
+        
+        return [drug for drug in essential_drugs if drug.properties["Is_Generic"] is False]
 
     @staticmethod
     def find_drugs_under_patent(drug_list, filename="patent.txt"):
@@ -223,7 +233,6 @@ essential_drugs_list = ['abacavir','abacavir+lamivudine','acyclovir','albendazol
 ## not an essential_drug. i.e. valacyclovir contains 'acyclovir' which is an essential_drug,
 ## while 'valacyclovir' is not itself an essential_drug.
 bad_words = ['valacyclovir','bacampicillin']
-
 
 if __name__=="__main__":
     drug_list = Drug.get_drugs_from_products_file('products.txt')
